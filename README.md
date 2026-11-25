@@ -2,17 +2,21 @@
 
 Учебный проект производственной практики, ООО «Юнитех Экспорт», IT-отдел. PostgreSQL 16 + Python 3 / Flask 3.
 
-## Версия v4.0 — триггеры и роли СУБД
+## Версия v5.0 — финальная версия
 
 ### Что вошло в версию
-- триггеры: `trg_order_items_line_sum`, `trg_order_items_total` (суммы), `trg_orders_status_audit` (журнал статусов), `trg_orders_updated_at`, `trg_products_updated_at`, `trg_users_updated_at`
-- пересчёт суммы заказа перенесён из процедуры в триггеры
-- `sql/05_roles.sql`: роли `ute_reader`, `ute_operator`, `ute_admin` и пользователи `ute_app_reader`, `ute_app_operator`, `ute_app_admin`
-- приложение подключается под учётной записью СУБД, соответствующей роли пользователя (`APP_ROLE_TO_DB` в `app/db.py`)
+- все SQL-скрипты: `01_schema`, `02_data`, `03_objects`, `05_roles` и полный дамп `sql/dump_final.sql`
+- финальное веб-приложение (CRUD, VIEW, процедуры, триггеры, роли СУБД, хэширование паролей)
+- `docs/`: ER-диаграмма, схема навигации и все рисунки отчёта в формате draw.io
+
+**Тестовые учётные записи:** admin (администратор), lebedeva, tarasov, shevchenko (менеджеры), kuzmina, egorova (бухгалтеры), vlasov (наблюдатель).
 
 ### Развёртывание
-1. Выполнить по порядку: `sql/01_schema.sql`, `sql/02_data.sql`, `sql/03_objects.sql`, `sql/05_roles.sql` (пароли пользователей СУБД задать свои)
-2. В `pg_hba.conf` для 127.0.0.1 указать `scram-sha-256`
-3. `pip install flask psycopg2-binary`
-4. `app/.env` по образцу `app/.env.example`
-5. `cd app && python app.py` → http://127.0.0.1:5080
+**Вариант А — из дампа:**
+1. `createdb unitech_orders`
+2. `psql -d unitech_orders -f sql/dump_final.sql`
+3. `psql -d unitech_orders -f sql/05_roles.sql`
+
+**Вариант Б — по скриптам:** `01_schema.sql` → `02_data.sql` → `03_objects.sql` → `05_roles.sql`
+
+Далее: `pip install flask psycopg2-binary`, создать `app/.env` по образцу `app/.env.example`, запустить `cd app && python app.py` и открыть http://127.0.0.1:5080

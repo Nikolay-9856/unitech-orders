@@ -2,14 +2,16 @@
 
 Учебный проект производственной практики, ООО «Юнитех Экспорт», IT-отдел. PostgreSQL 16 + Python 3 / Flask 3.
 
-## Версия v1.0 — DDL и тестовые данные
+## Версия v2.0 — CRUD-приложение
 
 ### Что вошло в версию
-- `sql/01_schema.sql` — 9 таблиц, PK/FK, UNIQUE, CHECK, индексы, комментарии
-- `sql/02_data.sql` — тестовые данные (роли, пользователи, клиенты, категории, товары, заказы, позиции, оплаты, история статусов)
-- `docs/` — ER-диаграмма в формате draw.io
+- веб-приложение на Flask: вход, главная, заказы, карточка заказа, клиенты, товары и остатки, отчёты
+- CRUD для таблицы `orders`: READ (реестр с фильтрами), CREATE (автонумерация ЗК-ГГГГ-NNNNN), UPDATE реквизитов, DELETE с подтверждением; добавление и удаление позиций
+- отчёты с INNER / LEFT / RIGHT JOIN, GROUP BY
+- хэширование паролей SHA-256 с солью (`app/security.py`)
 
 ### Развёртывание
-1. `createdb unitech_orders`
-2. `psql -d unitech_orders -f sql/01_schema.sql`
-3. `psql -d unitech_orders -f sql/02_data.sql`
+1. Развернуть БД по шагам версии v1.0
+2. `pip install flask psycopg2-binary`
+3. Скопировать `app/.env.example` в `app/.env` и указать пароль
+4. `cd app && python app.py` → http://127.0.0.1:5080

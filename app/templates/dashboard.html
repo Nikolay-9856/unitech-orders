@@ -1,0 +1,24 @@
+{% extends 'base.html' %}{% from '_macros.html' import st, dt %}
+{% block head %}Главная{% endblock %}
+{% block body %}
+<div class="kpis">
+  <div class="kpi"><div class="v">{{ totals.active }}</div><div class="l">заказов в работе</div></div>
+  <div class="kpi"><div class="v">{{ totals.in_work|money }}</div><div class="l">сумма заказов в работе, ₽</div></div>
+  <div class="kpi"><div class="v">{{ totals.debt|money }}</div><div class="l">задолженность клиентов, ₽</div></div>
+  <div class="kpi warn"><div class="v">{{ totals.overdue }}</div><div class="l">просрочено по сроку</div></div>
+</div>
+<div class="row">
+<div class="card" style="flex:1.5"><h2>Крупнейшие клиенты <span class="muted">(VIEW v_customer_stats)</span></h2>
+<table class="grid"><tr><th>Клиент</th><th>Страна</th><th>Заказов</th><th class="num">Сумма, ₽</th><th class="num">Долг, ₽</th></tr>
+{% for c in customers %}<tr><td>{{ c.name }}</td><td>{{ c.country }}</td><td>{{ c.orders_cnt }}</td><td class="num">{{ c.ordered|money }}</td>
+<td class="num {{ 'over' if c.debt > 0 }}">{{ c.debt|money }}</td></tr>{% endfor %}</table>
+<h2 style="margin-top:18px">Мои заказы в работе</h2>
+{% if mine %}<table class="grid"><tr><th>Заказ</th><th>Клиент</th><th>Статус</th><th>Срок</th></tr>
+{% for o in mine %}<tr><td><a href="{{ url_for('order_card', order_id=o.order_id) }}">{{ o.order_number }}</a></td><td>{{ o.customer }}</td><td>{{ st(o.status) }}</td>
+<td class="{{ 'over' if o.is_overdue }}">{{ dt(o.due_date) }}</td></tr>{% endfor %}</table>
+{% else %}<p class="muted">Заказов, закреплённых за вами, нет.</p>{% endif %}
+</div>
+<div class="card" style="flex:1"><h2>Последние изменения статусов</h2>
+<table class="grid">{% for r in recent %}<tr><td class="muted">{{ dt(r.changed_at,'%d.%m %H:%M') }}</td><td>{{ r.order_number }}</td><td>{{ st(r.new_status) }}</td></tr>{% endfor %}</table>
+</div></div>
+{% endblock %}

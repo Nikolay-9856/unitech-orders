@@ -1,0 +1,8 @@
+{% extends 'base.html' %}
+{% block head %}Товары и остатки{% endblock %}
+{% block body %}
+<div class="card"><h2>Номенклатура <span class="muted">(VIEW v_product_sales, без отменённых заказов)</span></h2>
+<table class="grid"><tr><th>Артикул</th><th>Наименование</th><th>Категория</th><th>Ед.</th><th class="num">Остаток</th><th class="num">Продано</th><th class="num">Выручка, ₽</th></tr>
+{% for p in rows %}<tr><td>{{ p.sku }}</td><td>{{ p.name }}</td><td>{{ p.category }}</td><td>{{ p.unit }}</td>
+<td class="num {{ 'over' if p.stock_qty < 10 }}">{{ p.stock_qty }}</td><td class="num">{{ p.sold_qty }}</td><td class="num">{{ p.revenue|money }}</td></tr>{% endfor %}</table></div>
+{% endblock %}

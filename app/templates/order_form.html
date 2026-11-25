@@ -1,0 +1,20 @@
+{% extends 'base.html' %}
+{% block head %}{{ 'Изменение заказа ' ~ o.order_number if o else 'Новый заказ' }}{% endblock %}
+{% block body %}
+<form class="card" method="post" style="max-width:860px">
+<h2>{{ 'Реквизиты заказа' if o else 'Создание заказа' }}</h2>
+<div class="form-grid">
+  <div class="full"><label>Клиент *</label><select name="customer_id" required><option value="">— выберите клиента —</option>
+    {% for c in customers %}<option value="{{ c.id }}" {{ 'selected' if (form.customer_id|string)==(c.id|string) or (o and o.customer_id==c.id) }}>{{ c.name }}</option>{% endfor %}</select></div>
+  <div><label>Срок поставки</label><input type="date" name="due_date" value="{{ form.due_date or (o.due_date if o and o.due_date else '') }}"></div>
+  <div><label>Номер заказа</label><input value="{{ o.order_number if o else 'присваивается автоматически' }}" disabled></div>
+  <div class="full"><label>Адрес доставки</label><input name="delivery_address" maxlength="200" value="{{ form.delivery_address or (o.delivery_address if o and o.delivery_address else '') }}"></div>
+  <div class="full"><label>Комментарий</label><input name="comment" maxlength="300" value="{{ form.comment or (o.comment if o and o.comment else '') }}"></div>
+  {% if o %}<div><label>Статус</label><input value="{{ o.status }}" disabled></div>
+  <div><label>Сумма заказа, ₽</label><input value="{{ o.total_amount|money }}" disabled></div>{% endif %}
+</div>
+<div class="actions" style="justify-content:flex-start">
+  <button class="btn">{{ 'Сохранить изменения' if o else 'Создать заказ' }}</button>
+  <a class="btn sec" href="{{ url_for('order_card', order_id=o.order_id) if o else url_for('orders') }}">Отмена</a></div>
+</form>
+{% endblock %}

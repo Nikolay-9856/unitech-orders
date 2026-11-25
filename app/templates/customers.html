@@ -1,0 +1,14 @@
+{% extends 'base.html' %}{% from '_macros.html' import dt %}
+{% block head %}Клиенты{% endblock %}
+{% block body %}
+{% if can('customers') %}<form class="card filters" method="post">
+<div><label>Наименование</label><input name="name" required style="min-width:240px"></div>
+<div><label>Налоговый номер</label><input name="tax_id" required maxlength="14" style="min-width:140px"></div>
+<div><label>Страна</label><input name="country" required style="min-width:120px"></div>
+<div><label>E-mail</label><input name="email" type="email"></div>
+<div><button class="btn">Добавить</button></div></form>{% endif %}
+<div class="card"><h2>Клиенты и задолженность <span class="muted">(VIEW v_customer_stats)</span></h2>
+<table class="grid"><tr><th>Клиент</th><th>Налог. номер</th><th>Страна</th><th>Менеджер</th><th>Заказов</th><th class="num">Сумма, ₽</th><th class="num">Оплачено, ₽</th><th class="num">Долг, ₽</th><th>Посл. заказ</th></tr>
+{% for c in rows %}<tr><td>{{ c.name }}</td><td>{{ c.tax_id }}</td><td>{{ c.country }}</td><td>{{ c.manager or '—' }}</td><td>{{ c.orders_cnt }}</td>
+<td class="num">{{ c.ordered|money }}</td><td class="num">{{ c.paid|money }}</td><td class="num {{ 'over' if c.debt > 0 }}">{{ c.debt|money }}</td><td>{{ dt(c.last_order) }}</td></tr>{% endfor %}</table></div>
+{% endblock %}

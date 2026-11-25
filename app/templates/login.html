@@ -1,0 +1,13 @@
+<!doctype html><html lang="ru"><head><meta charset="utf-8"><title>Вход — Юнитех.Заказы</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}"></head>
+<body><div class="login-wrap"><form class="login-box" method="post" autocomplete="off">
+  <h1>Юнитех.Заказы</h1>
+  <p class="muted" style="margin:0 0 20px">Учёт заказов ООО «Юнитех Экспорт»</p>
+  {% with msgs = get_flashed_messages(with_categories=true) %}
+    {% for cat, m in msgs %}<div class="flash {{ cat }}">{{ m }}</div>{% endfor %}
+  {% endwith %}
+  <label>Логин</label><input name="login" value="{{ request.form.login }}" autofocus>
+  <label>Пароль</label><input name="password" type="password">
+  <button class="btn">Войти</button>
+  <p class="muted" style="margin:16px 0 0;text-align:center">Доступ только для сотрудников компании</p>
+</form></div></body></html>

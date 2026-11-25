@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8">
+<title>{% block title %}Юнитех.Заказы{% endblock %}</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}"></head>
+<body>
+<div class="layout">
+  <aside class="side">
+    <div class="brand"><b>Юнитех.Заказы</b><span>ООО «Юнитех Экспорт» · учёт заказов</span></div>
+    <nav>
+      <div class="sect">Продажи</div>
+      <a href="{{ url_for('dashboard') }}" class="{{ 'on' if request.endpoint=='dashboard' }}">Главная</a>
+      <a href="{{ url_for('orders') }}" class="{{ 'on' if request.endpoint in ('orders','order_card','order_edit','order_new') }}">Заказы</a>
+      <a href="{{ url_for('customers') }}" class="{{ 'on' if request.endpoint=='customers' }}">Клиенты</a>
+      <a href="{{ url_for('products') }}" class="{{ 'on' if request.endpoint=='products' }}">Товары и остатки</a>
+      <a href="{{ url_for('reports') }}" class="{{ 'on' if request.endpoint=='reports' }}">Отчёты</a>
+      {% if can('users') %}
+      <div class="sect">Администрирование</div>
+      <a href="{{ url_for('admin_users') }}" class="{{ 'on' if request.endpoint=='admin_users' }}">Пользователи</a>
+      {% endif %}
+      <a href="{{ url_for('logout') }}" style="margin-top:18px">Выход</a>
+    </nav>
+  </aside>
+  <section class="main">
+    <div class="top"><h1>{% block head %}{% endblock %}</h1>
+      <div class="who"><b>{{ me.full_name }}</b><br><span class="badge">{{ me.role_name }}</span></div></div>
+    <div class="content">
+      {% with msgs = get_flashed_messages(with_categories=true) %}
+        {% for cat, m in msgs %}<div class="flash {{ cat }}">{{ m }}</div>{% endfor %}
+      {% endwith %}
+      {% block body %}{% endblock %}
+    </div>
+  </section>
+</div>
+{% block modal %}{% endblock %}
+</body></html>

@@ -1,0 +1,15 @@
+{% extends 'base.html' %}
+{% block head %}Отчёты{% endblock %}
+{% block body %}
+<div class="row">
+<div class="card"><h2>Продажи по менеджерам <span class="muted">(RIGHT JOIN users)</span></h2>
+<table class="grid"><tr><th>Менеджер</th><th>Заказов</th><th class="num">Сумма, ₽</th></tr>
+{% for m in managers %}<tr><td>{{ m.full_name }}</td><td>{{ m.orders_cnt }}</td><td class="num">{{ m.amount|money }}</td></tr>{% endfor %}</table></div>
+<div class="card"><h2>Выручка по категориям <span class="muted">(RIGHT JOIN product_categories)</span></h2>
+<table class="grid"><tr><th>Категория</th><th>Строк</th><th class="num">Сумма, ₽</th></tr>
+{% for c in by_category %}<tr><td>{{ c.name }}</td><td>{{ c.lines }}</td><td class="num">{{ c.revenue|money }}</td></tr>{% endfor %}</table></div>
+</div>
+<div class="card"><h2>Дебиторская задолженность <span class="muted">(VIEW v_customer_stats)</span></h2>
+<table class="grid"><tr><th>Клиент</th><th>Страна</th><th class="num">Сумма заказов, ₽</th><th class="num">Оплачено, ₽</th><th class="num">Долг, ₽</th></tr>
+{% for d in debtors %}<tr><td>{{ d.name }}</td><td>{{ d.country }}</td><td class="num">{{ d.ordered|money }}</td><td class="num">{{ d.paid|money }}</td><td class="num over">{{ d.debt|money }}</td></tr>{% endfor %}</table></div>
+{% endblock %}

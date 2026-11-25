@@ -1,0 +1,40 @@
+{% extends 'base.html' %}{% from '_macros.html' import st, dt %}
+{% block head %}Заказы{% endblock %}
+{% block body %}
+<div class="card"><form class="filters" method="get">
+  <div><label>Поиск по номеру / клиенту</label><input name="q" value="{{ f_q }}" style="min-width:220px"></div>
+  <div><label>Статус</label><select name="status"><option value="">все</option>
+    {% for s in statuses %}<option {{ 'selected' if s==f_status }}>{{ s }}</option>{% endfor %}</select></div>
+  <div><label>Клиент</label><select name="customer"><option value="">все</option>
+    {% for c in customers %}<option {{ 'selected' if c.name==f_customer }}>{{ c.name }}</option>{% endfor %}</select></div>
+  <div><button class="btn sec">Применить</button></div>
+  {% if can('order_create') %}<div style="margin-left:auto"><a class="btn" href="{{ url_for('order_new') }}">+ Новый заказ</a></div>{% endif %}
+</form></div>
+<div class="card"><h2>Найдено заказов: {{ rows|length }} <span class="muted">(источник — VIEW v_orders_full)</span></h2>
+<table class="grid"><tr><th>Номер</th><th>Дата</th><th>Клиент</th><th>Страна</th><th>Менеджер</th><th>Статус</th><th>Срок</th><th class="num">Сумма, ₽</th><th class="num">Долг, ₽</th>{% if can('order_edit') %}<th></th>{% endif %}</tr>
+{% for o in rows %}<tr>
+<td><a href="{{ url_for('order_card', order_id=o.order_id) }}">{{ o.order_number }}</a></td><td>{{ dt(o.order_date) }}</td><td>{{ o.customer }}</td><td>{{ o.country }}</td>
+<td>{{ o.manager }}</td><td>{{ st(o.status) }}</td><td class="{{ 'over' if o.is_overdue }}">{{ dt(o.due_date) }}</td>
+<td class="num">{{ o.total_amount|money }}</td><td class="num">{{ o.debt|money if o.status != 'Отменён' else '—' }}</td>
+{% if can('order_edit') %}<td style="white-space:nowrap">
+{% if o.status in ('Новый','Подтверждён') %}<a class="btn sec sm" href="{{ url_for('order_edit', order_id=o.order_id) }}">Изменить</a>{% endif %}
+{% if o.status in ('Новый','Отменён') %}<button class="btn red sm" type="button" onclick="askDelete({{ o.order_id }}, '{{ o.order_number }}', '{{ o.customer|e }}')">Удалить</button>{% endif %}</td>{% endif %}
+</tr>{% endfor %}</table></div>
+{% endblock %}
+{% block modal %}
+<div class="modal-bg" id="delModal"><form class="modal" method="post" id="delForm">
+  <h3>Удаление заказа</h3>
+  <p>Удалить заказ <b id="delNum"></b>?</p><p class="muted" id="delCust"></p>
+  <p class="muted">Вместе с заказом будут удалены его позиции, оплаты и история статусов (ON DELETE CASCADE). Действие необратимо.</p>
+  <div class="actions"><button type="button" class="btn sec" onclick="closeDel()">Отмена</button><button class="btn red">Удалить</button></div>
+</form></div>
+<script>
+function askDelete(id, num, customer){
+  document.getElementById('delForm').action = '/orders/' + id + '/delete';
+  document.getElementById('delNum').textContent = num;
+  document.getElementById('delCust').textContent = 'Клиент: ' + customer;
+  document.getElementById('delModal').classList.add('open');
+}
+function closeDel(){ document.getElementById('delModal').classList.remove('open'); }
+</script>
+{% endblock %}

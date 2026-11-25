@@ -1,0 +1,45 @@
+{% extends 'base.html' %}{% from '_macros.html' import st, dt %}
+{% block head %}Заказ {{ o.order_number }}{% endblock %}
+{% block body %}
+<div class="row">
+<div class="card" style="flex:1.2"><h2>{{ o.customer }} <span class="muted">({{ o.country }})</span></h2>
+<div class="props">
+<div>Статус</div><div>{{ st(o.status) }}</div>
+<div>Дата заказа</div><div>{{ dt(o.order_date) }}</div><div>Срок поставки</div><div class="{{ 'over' if o.is_overdue }}">{{ dt(o.due_date) }}</div>
+<div>Менеджер</div><div>{{ o.manager }}</div><div>Адрес доставки</div><div>{{ extra.delivery_address or '—' }}</div>
+<div>Комментарий</div><div>{{ extra.comment or '—' }}</div>
+<div>Сумма / оплачено</div><div><b>{{ o.total_amount|money }} ₽</b> / {{ o.paid|money }} ₽</div>
+<div>Остаток к оплате</div><div class="{{ 'over' if o.debt > 0 and o.status != 'Отменён' }}">{{ o.debt|money }} ₽</div>
+</div>
+<div class="actions" style="justify-content:flex-start">
+{% if can('order_edit') and o.status in ('Новый','Подтверждён') %}<a class="btn sec" href="{{ url_for('order_edit', order_id=o.order_id) }}">Изменить реквизиты</a>{% endif %}
+{% if can('order_status') %}{% for s in next_status %}
+<form method="post" action="{{ url_for('order_status', order_id=o.order_id) }}"><button class="btn {{ 'red' if s=='Отменён' else '' }}" name="status" value="{{ s }}">→ {{ s }}</button></form>{% endfor %}{% endif %}
+</div></div>
+<div class="card" style="flex:1"><h2>История статусов</h2>
+<table class="grid">{% for h in history %}<tr><td class="muted">{{ dt(h.changed_at,'%d.%m.%Y %H:%M') }}</td><td>{{ h.old_status or '—' }} → {{ st(h.new_status) }}</td><td>{{ h.full_name or '' }}</td></tr>{% endfor %}</table>
+</div></div>
+<div class="card"><h2>Позиции заказа</h2>
+<table class="grid"><tr><th>Артикул</th><th>Наименование</th><th class="num">Кол-во</th><th>Ед.</th><th class="num">Цена, ₽</th><th class="num">Сумма, ₽</th><th></th></tr>
+{% for i in items %}<tr><td>{{ i.sku }}</td><td>{{ i.name }}</td><td class="num">{{ i.qty }}</td><td>{{ i.unit }}</td><td class="num">{{ i.price|money }}</td><td class="num">{{ i.line_sum|money }}</td>
+<td>{% if can('order_edit') and o.status=='Новый' %}<form method="post" action="{{ url_for('item_delete', order_id=o.order_id, item_id=i.item_id) }}"><button class="btn red sm">×</button></form>{% endif %}</td></tr>
+{% else %}<tr><td colspan="7" class="muted">Позиции ещё не добавлены</td></tr>{% endfor %}
+<tr class="total-row"><td colspan="5">Итого</td><td class="num">{{ o.total_amount|money }}</td><td></td></tr></table>
+{% if can('order_edit') and o.status=='Новый' %}
+<form class="inline" method="post" action="{{ url_for('item_add', order_id=o.order_id) }}" style="margin-top:14px">
+<div><label>Товар</label><select name="product_id" style="min-width:420px">{% for p in products %}<option value="{{ p.id }}">{{ p.name }}</option>{% endfor %}</select></div>
+<div><label>Количество</label><input name="qty" type="number" min="1" value="1" style="min-width:90px;width:90px"></div>
+<div><button class="btn">Добавить</button></div></form>{% endif %}
+</div>
+<div class="card"><h2>Оплаты</h2>
+<table class="grid"><tr><th>Дата</th><th>Способ</th><th>Документ</th><th class="num">Сумма, ₽</th><th>Внёс</th></tr>
+{% for p in payments %}<tr><td>{{ dt(p.paid_at,'%d.%m.%Y %H:%M') }}</td><td>{{ p.method }}</td><td>{{ p.doc_ref or '' }}</td><td class="num">{{ p.amount|money }}</td><td>{{ p.full_name }}</td></tr>
+{% else %}<tr><td colspan="5" class="muted">Оплат нет</td></tr>{% endfor %}</table>
+{% if can('payment') and o.status not in ('Новый','Отменён','Закрыт') and o.debt > 0 %}
+<form class="inline" method="post" action="{{ url_for('payment_add', order_id=o.order_id) }}" style="margin-top:14px">
+<div><label>Сумма, ₽</label><input name="amount" value="{{ o.debt }}" style="min-width:140px;width:140px"></div>
+<div><label>Способ</label><select name="method">{% for m in methods %}<option>{{ m }}</option>{% endfor %}</select></div>
+<div><label>Номер документа</label><input name="doc_ref" style="min-width:130px;width:130px"></div>
+<div><button class="btn">Внести оплату (sp_register_payment)</button></div></form>{% endif %}
+</div>
+{% endblock %}

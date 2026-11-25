@@ -2,16 +2,16 @@
 
 Учебный проект производственной практики, ООО «Юнитех Экспорт», IT-отдел. PostgreSQL 16 + Python 3 / Flask 3.
 
-## Версия v2.0 — CRUD-приложение
+## Версия v3.0 — представления и хранимые процедуры
 
 ### Что вошло в версию
-- веб-приложение на Flask: вход, главная, заказы, карточка заказа, клиенты, товары и остатки, отчёты
-- CRUD для таблицы `orders`: READ (реестр с фильтрами), CREATE (автонумерация ЗК-ГГГГ-NNNNN), UPDATE реквизитов, DELETE с подтверждением; добавление и удаление позиций
-- отчёты с INNER / LEFT / RIGHT JOIN, GROUP BY
-- хэширование паролей SHA-256 с солью (`app/security.py`)
+- `sql/03_objects.sql`: VIEW `v_orders_full`, `v_customer_stats`, `v_product_sales`; процедуры `sp_create_order`, `sp_add_order_item`, `sp_change_order_status`, `sp_register_payment`, `sp_register_user`
+- в карточке заказа: смена статуса по допустимым переходам с резервированием остатка, регистрация оплат
+- страница «Пользователи» для администратора
+- обработка ошибок RAISE EXCEPTION по коду SQLSTATE
 
 ### Развёртывание
-1. Развернуть БД по шагам версии v1.0
+1. Выполнить `sql/01_schema.sql`, `sql/02_data.sql`, `sql/03_objects.sql`
 2. `pip install flask psycopg2-binary`
-3. Скопировать `app/.env.example` в `app/.env` и указать пароль
+3. `app/.env` по образцу `app/.env.example`
 4. `cd app && python app.py` → http://127.0.0.1:5080

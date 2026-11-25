@@ -1,6 +1,7 @@
 """Юнитех.Заказы — веб-приложение для учёта заказов ООО «Юнитех Экспорт»."""
 import os
-from datetime import date, timedelta
+from datetime import timedelta
+from decimal import Decimal, InvalidOperation
 
 import psycopg2
 from flask import Flask, flash, redirect, render_template, request, url_for
@@ -14,61 +15,8 @@ app = Flask(__name__)
 app.secret_key = os.environ["SECRET_KEY"]
 app.permanent_session_lifetime = timedelta(hours=8)
 
-
-# --- до версии v3.0 представлений в БД нет: тот же SQL как подзапросы ---
-ORDERS_SQL = """(
-SELECT o.order_id,
-       o.order_number,
-       o.order_date,
-       o.due_date,
-       o.status,
-       c.name                              AS customer,
-       c.country,
-       u.full_name                         AS manager,
-       o.total_amount,
-       COALESCE(p.paid, 0)                 AS paid,
-       o.total_amount - COALESCE(p.paid, 0) AS debt,
-       (o.due_date < current_date
-        AND o.status NOT IN ('Отгружен','Закрыт','Отменён')) AS is_overdue,
-       o.updated_at
-FROM orders o
-JOIN customers c ON c.customer_id = o.customer_id
-JOIN users     u ON u.user_id     = o.manager_id
-LEFT JOIN (SELECT order_id, SUM(amount) AS paid
-           FROM payments GROUP BY order_id) p ON p.order_id = o.order_id
-) v"""
-
-CUSTOMERS_SQL = """(
-SELECT c.customer_id,
-       c.name,
-       c.country,
-       COUNT(o.order_id) FILTER (WHERE o.status <> 'Отменён')         AS orders_cnt,
-       COALESCE(SUM(o.total_amount) FILTER (WHERE o.status <> 'Отменён'), 0) AS ordered,
-       COALESCE(SUM(pp.paid), 0)                                      AS paid,
-       COALESCE(SUM(o.total_amount) FILTER (WHERE o.status <> 'Отменён'), 0)
-         - COALESCE(SUM(pp.paid), 0)                                  AS debt,
-       MAX(o.order_date)                                              AS last_order
-FROM customers c
-LEFT JOIN orders o ON o.customer_id = c.customer_id
-LEFT JOIN (SELECT order_id, SUM(amount) AS paid
-           FROM payments GROUP BY order_id) pp ON pp.order_id = o.order_id
-GROUP BY c.customer_id, c.name, c.country
-) s"""
-
-PRODUCTS_SQL = """(
-SELECT pr.product_id, pr.sku, pr.name, pc.name AS category, pr.unit,
-       pr.stock_qty,
-       COALESCE(SUM(oi.qty), 0)      AS sold_qty,
-       COALESCE(SUM(oi.line_sum), 0) AS revenue
-FROM products pr
-JOIN product_categories pc ON pc.category_id = pr.category_id
-LEFT JOIN order_items oi ON oi.product_id = pr.product_id
-     AND oi.order_id IN (SELECT order_id FROM orders WHERE status <> 'Отменён')
-GROUP BY pr.product_id, pr.sku, pr.name, pc.name, pr.unit, pr.stock_qty
-) ps"""
-
 STATUSES = ["Новый", "Подтверждён", "Комплектуется", "Отгружен", "Закрыт", "Отменён"]
-# статусы заказа; смена статуса процедурой появится в версии v3.0
+# какие кнопки смены статуса показывать (сами правила проверяет sp_change_order_status)
 NEXT_STATUS = {
     "Новый": ["Подтверждён", "Отменён"],
     "Подтверждён": ["Комплектуется", "Отменён"],
@@ -144,11 +92,11 @@ def dashboard():
                   COALESCE(SUM(total_amount) FILTER (WHERE status NOT IN ('Закрыт','Отменён')), 0) AS in_work,
                   COALESCE(SUM(debt) FILTER (WHERE status <> 'Отменён'), 0) AS debt,
                   COUNT(*) FILTER (WHERE is_overdue) AS overdue
-           FROM """ + ORDERS_SQL)
+           FROM v_orders_full""")
     customers = DBConnection.query(
-        f"SELECT * FROM {CUSTOMERS_SQL} WHERE orders_cnt > 0 ORDER BY ordered DESC LIMIT 5")
+        "SELECT * FROM v_customer_stats WHERE orders_cnt > 0 ORDER BY ordered DESC LIMIT 5")
     mine = DBConnection.query(
-        f"""SELECT * FROM {ORDERS_SQL}
+        """SELECT * FROM v_orders_full
            WHERE manager = %s AND status NOT IN ('Закрыт','Отменён') ORDER BY due_date""",
         (AppSession.current()["full_name"],))
     recent = DBConnection.query(
@@ -165,7 +113,7 @@ def orders():
     status = request.args.get("status", "")
     customer = request.args.get("customer", "")
     text = request.args.get("q", "").strip()
-    sql = f"SELECT * FROM {ORDERS_SQL} WHERE TRUE"
+    sql = "SELECT * FROM v_orders_full WHERE TRUE"
     params = []
     if status:
         sql += " AND status = %s"
@@ -186,7 +134,7 @@ def orders():
 @app.route("/orders/<int:order_id>")
 @login_required
 def order_card(order_id):
-    order = DBConnection.query_one(f"SELECT * FROM {ORDERS_SQL} WHERE order_id = %s", (order_id,))
+    order = DBConnection.query_one("SELECT * FROM v_orders_full WHERE order_id = %s", (order_id,))
     if not order:
         flash("Заказ не найден", "error")
         return redirect(url_for("orders"))
@@ -217,19 +165,13 @@ def order_new():
     form = request.form
     if request.method == "POST":
         try:
-            with DBConnection.cursor() as cur:
-                cur.execute("""SELECT COALESCE(MAX(split_part(order_number, '-', 3)::INT), 0) + 1 AS n
-                               FROM orders WHERE split_part(order_number, '-', 2) = to_char(current_date, 'YYYY')""")
-                number = f"ЗК-{date.today():%Y}-{cur.fetchone()['n']:05d}"
-                cur.execute(
-                    """INSERT INTO orders (order_number, customer_id, manager_id, due_date, delivery_address, comment)
-                       VALUES (%s, %s, %s, %s, %s, %s) RETURNING order_id""",
-                    (number, int(form["customer_id"]), AppSession.current()["user_id"],
-                     form.get("due_date") or None, form.get("delivery_address") or None,
-                     form.get("comment") or None))
-                order_id = cur.fetchone()["order_id"]
-            flash(f"Заказ создан: {number}. Добавьте позиции.", "ok")
-            return redirect(url_for("order_card", order_id=order_id))
+            res = DBConnection.call("sp_create_order", (
+                int(form["customer_id"]), AppSession.current()["user_id"],
+                form.get("due_date") or None, form.get("delivery_address") or None,
+                form.get("comment") or None, None, None),
+                app_role=AppSession.role(), casts={2: "date"})
+            flash(f"Заказ создан: {res['p_order_number']}. Добавьте позиции.", "ok")
+            return redirect(url_for("order_card", order_id=res["p_order_id"]))
         except psycopg2.Error as exc:
             flash(db_error_text(exc), "error")
     return render_template("order_form.html", o=None, form=form,
@@ -281,20 +223,9 @@ def order_delete(order_id):
 @permission_required("order_edit")
 def item_add(order_id):
     try:
-        qty = int(request.form["qty"])
-        with DBConnection.cursor() as cur:
-            cur.execute("SELECT price FROM products WHERE product_id = %s", (int(request.form["product_id"]),))
-            price = cur.fetchone()["price"]
-            cur.execute(
-                """INSERT INTO order_items (order_id, product_id, qty, price, line_sum)
-                   VALUES (%s, %s, %s, %s, %s)
-                   ON CONFLICT (order_id, product_id) DO UPDATE
-                   SET qty = order_items.qty + EXCLUDED.qty,
-                       line_sum = (order_items.qty + EXCLUDED.qty) * order_items.price""",
-                (order_id, int(request.form["product_id"]), qty, price, qty * price))
-            cur.execute("""UPDATE orders SET total_amount =
-                       (SELECT COALESCE(SUM(line_sum), 0) FROM order_items WHERE order_id = %s)
-                   WHERE order_id = %s""", (order_id, order_id))
+        DBConnection.call("sp_add_order_item",
+                          (order_id, int(request.form["product_id"]), int(request.form["qty"])),
+                          app_role=AppSession.role())
         flash("Позиция добавлена, сумма заказа пересчитана", "ok")
     except (psycopg2.Error, ValueError) as exc:
         flash(db_error_text(exc) if isinstance(exc, psycopg2.Error) else "Укажите количество числом", "error")
@@ -315,6 +246,36 @@ def item_delete(order_id, item_id):
     return redirect(url_for("order_card", order_id=order_id))
 
 
+@app.route("/orders/<int:order_id>/status", methods=["POST"])
+@permission_required("order_status")
+def order_status(order_id):
+    try:
+        DBConnection.call("sp_change_order_status",
+                          (order_id, request.form["status"], AppSession.current()["user_id"]),
+                          app_role=AppSession.role())
+        flash(f"Статус изменён: {request.form['status']}", "ok")
+    except psycopg2.Error as exc:
+        flash(db_error_text(exc), "error")
+    return redirect(url_for("order_card", order_id=order_id))
+
+
+@app.route("/orders/<int:order_id>/payments", methods=["POST"])
+@permission_required("payment")
+def payment_add(order_id):
+    try:
+        amount = Decimal(request.form["amount"].replace(" ", "").replace(",", "."))
+        res = DBConnection.call("sp_register_payment",
+                                (order_id, amount, request.form["method"], request.form.get("doc_ref") or None,
+                                 AppSession.current()["user_id"], None),
+                                app_role=AppSession.role(), casts={1: "numeric"})
+        flash(f"Оплата № {res['p_payment_id']} зарегистрирована", "ok")
+    except InvalidOperation:
+        flash("Сумма указана неверно", "error")
+    except psycopg2.Error as exc:
+        flash(db_error_text(exc), "error")
+    return redirect(url_for("order_card", order_id=order_id))
+
+
 # ---------------- клиенты и товары ----------------
 @app.route("/customers", methods=["GET", "POST"])
 @login_required
@@ -331,7 +292,7 @@ def customers():
         except psycopg2.Error as exc:
             flash("Налоговый номер — от 9 до 14 цифр" if exc.pgcode == "23514" else db_error_text(exc), "error")
     rows = DBConnection.query(
-        f"""SELECT s.*, c.tax_id, u.full_name AS manager FROM {CUSTOMERS_SQL}
+        """SELECT s.*, c.tax_id, u.full_name AS manager FROM v_customer_stats s
            JOIN customers c ON c.customer_id = s.customer_id
            LEFT JOIN users u ON u.user_id = c.manager_id ORDER BY s.name""")
     return render_template("customers.html", rows=rows)
@@ -340,7 +301,7 @@ def customers():
 @app.route("/products")
 @login_required
 def products():
-    rows = DBConnection.query(f"SELECT * FROM {PRODUCTS_SQL} ORDER BY category, sku")
+    rows = DBConnection.query("SELECT * FROM v_product_sales ORDER BY category, sku")
     return render_template("products.html", rows=rows)
 
 
@@ -362,8 +323,43 @@ def reports():
            RIGHT JOIN product_categories pc ON pc.category_id = pr.category_id
            GROUP BY pc.name ORDER BY revenue DESC""")
     debtors = DBConnection.query(
-        f"SELECT * FROM {CUSTOMERS_SQL} WHERE debt > 0 ORDER BY debt DESC")
+        "SELECT * FROM v_customer_stats WHERE debt > 0 ORDER BY debt DESC")
     return render_template("reports.html", managers=managers, by_category=by_category, debtors=debtors)
+
+
+# ---------------- администрирование пользователей ----------------
+@app.route("/admin/users", methods=["GET", "POST"])
+@permission_required("users")
+def admin_users():
+    if request.method == "POST":
+        f = request.form
+        weak = PasswordHelper.check_strength(f["password"])
+        if weak:
+            flash("Пароль: " + ", ".join(weak), "error")
+        else:
+            salt = PasswordHelper.generate_salt()
+            pwd_hash = PasswordHelper.hash_password(f["password"], salt)
+            try:
+                res = DBConnection.call("sp_register_user", (
+                    f["login"].strip(), f["full_name"].strip(), f["email"].strip(),
+                    f.get("position") or None, f["role_code"], pwd_hash, salt, None), app_role="ADMIN")
+                flash(f"Пользователь создан, ID = {res['p_user_id']}", "ok")
+            except psycopg2.Error as exc:
+                flash(db_error_text(exc), "error")
+    rows = DBConnection.query(
+        """SELECT u.user_id, u.login, u.full_name, u.position, r.role_name, u.is_active,
+                  left(u.password_hash, 12) || '…' AS hash_head, u.created_at
+           FROM users u JOIN roles r ON r.role_id = u.role_id ORDER BY u.user_id""", app_role="ADMIN")
+    return render_template("users.html", rows=rows,
+                           roles=DBConnection.query("SELECT role_code, role_name FROM roles ORDER BY role_id"))
+
+
+@app.route("/admin/users/<int:user_id>/toggle", methods=["POST"])
+@permission_required("users")
+def admin_user_toggle(user_id):
+    DBConnection.execute("UPDATE users SET is_active = NOT is_active WHERE user_id = %s",
+                         (user_id,), app_role="ADMIN")
+    return redirect(url_for("admin_users"))
 
 
 @app.errorhandler(403)

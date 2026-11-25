@@ -12,7 +12,10 @@ class AppSession:
         "order_create": {"ADMIN", "MANAGER"},
         "order_edit":   {"ADMIN", "MANAGER"},
         "order_delete": {"ADMIN", "MANAGER"},
+        "order_status": {"ADMIN", "MANAGER"},
+        "payment":      {"ADMIN", "ACCOUNTANT"},
         "customers":    {"ADMIN", "MANAGER"},
+        "users":        {"ADMIN"},
     }
 
     @staticmethod

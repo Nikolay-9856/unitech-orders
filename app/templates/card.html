@@ -24,12 +24,12 @@
 {% for i in items %}<tr><td>{{ i.sku }}</td><td>{{ i.name }}</td><td class="num">{{ i.qty }}</td><td>{{ i.unit }}</td><td class="num">{{ i.price|money }}</td><td class="num">{{ i.line_sum|money }}</td>
 <td>{% if can('order_edit') and o.status=='Новый' %}<form method="post" action="{{ url_for('item_delete', order_id=o.order_id, item_id=i.item_id) }}"><button class="btn red sm">×</button></form>{% endif %}</td></tr>
 {% else %}<tr><td colspan="7" class="muted">Позиции ещё не добавлены</td></tr>{% endfor %}
-<tr class="total-row"><td colspan="5">Итого</td><td class="num">{{ o.total_amount|money }}</td><td></td></tr></table>
+<tr class="total-row"><td colspan="5">Итого (пересчитывает sp_add_order_item)</td><td class="num">{{ o.total_amount|money }}</td><td></td></tr></table>
 {% if can('order_edit') and o.status=='Новый' %}
 <form class="inline" method="post" action="{{ url_for('item_add', order_id=o.order_id) }}" style="margin-top:14px">
 <div><label>Товар</label><select name="product_id" style="min-width:420px">{% for p in products %}<option value="{{ p.id }}">{{ p.name }}</option>{% endfor %}</select></div>
 <div><label>Количество</label><input name="qty" type="number" min="1" value="1" style="min-width:90px;width:90px"></div>
-<div><button class="btn">Добавить</button></div></form>{% endif %}
+<div><button class="btn">Добавить (sp_add_order_item)</button></div></form>{% endif %}
 </div>
 <div class="card"><h2>Оплаты</h2>
 <table class="grid"><tr><th>Дата</th><th>Способ</th><th>Документ</th><th class="num">Сумма, ₽</th><th>Внёс</th></tr>

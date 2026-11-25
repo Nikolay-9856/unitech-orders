@@ -7,7 +7,7 @@
   <div class="full"><label>Клиент *</label><select name="customer_id" required><option value="">— выберите клиента —</option>
     {% for c in customers %}<option value="{{ c.id }}" {{ 'selected' if (form.customer_id|string)==(c.id|string) or (o and o.customer_id==c.id) }}>{{ c.name }}</option>{% endfor %}</select></div>
   <div><label>Срок поставки</label><input type="date" name="due_date" value="{{ form.due_date or (o.due_date if o and o.due_date else '') }}"></div>
-  <div><label>Номер заказа</label><input value="{{ o.order_number if o else 'присваивается автоматически' }}" disabled></div>
+  <div><label>Номер заказа</label><input value="{{ o.order_number if o else 'присваивается процедурой sp_create_order' }}" disabled></div>
   <div class="full"><label>Адрес доставки</label><input name="delivery_address" maxlength="200" value="{{ form.delivery_address or (o.delivery_address if o and o.delivery_address else '') }}"></div>
   <div class="full"><label>Комментарий</label><input name="comment" maxlength="300" value="{{ form.comment or (o.comment if o and o.comment else '') }}"></div>
   {% if o %}<div><label>Статус</label><input value="{{ o.status }}" disabled></div>

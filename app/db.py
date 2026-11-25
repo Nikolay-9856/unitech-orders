@@ -61,3 +61,13 @@ class DBConnection:
         with cls.cursor() as cur:
             cur.execute(sql, params)
             return cur.rowcount
+
+    @classmethod
+    def call(cls, proc, params, app_role=None, casts=None):
+        """CALL хранимой процедуры; возвращает значения INOUT-параметров."""
+        casts = casts or {}
+        placeholders = ", ".join(
+            f"%s::{casts[i]}" if i in casts else "%s" for i in range(len(params)))
+        with cls.cursor() as cur:
+            cur.execute(f"CALL {proc}({placeholders})", params)
+            return cur.fetchone() if cur.description else None

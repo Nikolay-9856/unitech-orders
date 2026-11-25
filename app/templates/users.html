@@ -1,0 +1,18 @@
+{% extends 'base.html' %}{% from '_macros.html' import dt %}
+{% block head %}Пользователи системы{% endblock %}
+{% block body %}
+<form class="card" method="post"><h2>Регистрация пользователя</h2>
+<div class="form-grid" style="grid-template-columns:repeat(4,1fr)">
+<div><label>Логин *</label><input name="login" required></div>
+<div><label>ФИО *</label><input name="full_name" required></div>
+<div><label>E-mail *</label><input name="email" type="email" required></div>
+<div><label>Должность</label><input name="position"></div>
+<div><label>Роль</label><select name="role_code">{% for r in roles %}<option value="{{ r.role_code }}">{{ r.role_name }}</option>{% endfor %}</select></div>
+<div><label>Пароль *</label><input name="password" type="password" required></div>
+<div style="align-self:end"><button class="btn">Создать (sp_register_user)</button></div>
+</div></form>
+<div class="card"><table class="grid"><tr><th>ID</th><th>Логин</th><th>ФИО</th><th>Должность</th><th>Роль</th><th>Хэш пароля</th><th>Создан</th><th>Статус</th></tr>
+{% for u in rows %}<tr><td>{{ u.user_id }}</td><td>{{ u.login }}</td><td>{{ u.full_name }}</td><td>{{ u.position or '' }}</td><td>{{ u.role_name }}</td>
+<td class="mono">{{ u.hash_head }}</td><td>{{ dt(u.created_at) }}</td>
+<td><form method="post" action="{{ url_for('admin_user_toggle', user_id=u.user_id) }}"><button class="btn sm {{ 'sec' if u.is_active else 'red' }}">{{ 'Активен' if u.is_active else 'Заблокирован' }}</button></form></td></tr>{% endfor %}</table></div>
+{% endblock %}

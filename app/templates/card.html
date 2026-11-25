@@ -16,7 +16,7 @@
 {% if can('order_status') %}{% for s in next_status %}
 <form method="post" action="{{ url_for('order_status', order_id=o.order_id) }}"><button class="btn {{ 'red' if s=='Отменён' else '' }}" name="status" value="{{ s }}">→ {{ s }}</button></form>{% endfor %}{% endif %}
 </div></div>
-<div class="card" style="flex:1"><h2>История статусов</h2>
+<div class="card" style="flex:1"><h2>История статусов <span class="muted">(триггер)</span></h2>
 <table class="grid">{% for h in history %}<tr><td class="muted">{{ dt(h.changed_at,'%d.%m.%Y %H:%M') }}</td><td>{{ h.old_status or '—' }} → {{ st(h.new_status) }}</td><td>{{ h.full_name or '' }}</td></tr>{% endfor %}</table>
 </div></div>
 <div class="card"><h2>Позиции заказа</h2>
@@ -24,7 +24,7 @@
 {% for i in items %}<tr><td>{{ i.sku }}</td><td>{{ i.name }}</td><td class="num">{{ i.qty }}</td><td>{{ i.unit }}</td><td class="num">{{ i.price|money }}</td><td class="num">{{ i.line_sum|money }}</td>
 <td>{% if can('order_edit') and o.status=='Новый' %}<form method="post" action="{{ url_for('item_delete', order_id=o.order_id, item_id=i.item_id) }}"><button class="btn red sm">×</button></form>{% endif %}</td></tr>
 {% else %}<tr><td colspan="7" class="muted">Позиции ещё не добавлены</td></tr>{% endfor %}
-<tr class="total-row"><td colspan="5">Итого (пересчитывает sp_add_order_item)</td><td class="num">{{ o.total_amount|money }}</td><td></td></tr></table>
+<tr class="total-row"><td colspan="5">Итого (пересчитывает триггер trg_order_items_total)</td><td class="num">{{ o.total_amount|money }}</td><td></td></tr></table>
 {% if can('order_edit') and o.status=='Новый' %}
 <form class="inline" method="post" action="{{ url_for('item_add', order_id=o.order_id) }}" style="margin-top:14px">
 <div><label>Товар</label><select name="product_id" style="min-width:420px">{% for p in products %}<option value="{{ p.id }}">{{ p.name }}</option>{% endfor %}</select></div>

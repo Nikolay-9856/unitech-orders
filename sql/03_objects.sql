@@ -1,5 +1,5 @@
 -- ============================================================
--- Объекты БД unitech_orders: представления и хранимые процедуры
+-- Объекты БД unitech_orders: представления, процедуры, триггеры
 -- ============================================================
 
 -- ---------- ПРЕДСТАВЛЕНИЯ ----------
@@ -128,16 +128,10 @@ BEGIN
     END IF;
 
     -- повторное добавление того же товара увеличивает количество
-    INSERT INTO order_items (order_id, product_id, qty, price, line_sum)
-    VALUES (p_order_id, p_product_id, p_qty, v_price, p_qty * v_price)
+    INSERT INTO order_items (order_id, product_id, qty, price)
+    VALUES (p_order_id, p_product_id, p_qty, v_price)
     ON CONFLICT (order_id, product_id)
-    DO UPDATE SET qty = order_items.qty + EXCLUDED.qty, price = EXCLUDED.price,
-                  line_sum = (order_items.qty + EXCLUDED.qty) * EXCLUDED.price;
-
-    -- до появления триггеров (v4.0) итог заказа пересчитывает сама процедура
-    UPDATE orders
-       SET total_amount = (SELECT COALESCE(SUM(line_sum), 0) FROM order_items WHERE order_id = p_order_id)
-     WHERE order_id = p_order_id;
+    DO UPDATE SET qty = order_items.qty + EXCLUDED.qty, price = EXCLUDED.price;
 END;
 $$;
 
@@ -263,3 +257,77 @@ BEGIN
     RETURNING user_id INTO p_user_id;
 END;
 $$;
+
+-- ---------- ТРИГГЕРЫ ----------
+
+-- Сумма строки позиции = количество × цена
+CREATE OR REPLACE FUNCTION fn_order_items_line_sum() RETURNS trigger
+LANGUAGE plpgsql AS $$
+BEGIN
+    NEW.line_sum := NEW.qty * NEW.price;
+    RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER trg_order_items_line_sum
+BEFORE INSERT OR UPDATE OF qty, price ON order_items
+FOR EACH ROW EXECUTE FUNCTION fn_order_items_line_sum();
+
+-- Пересчёт итоговой суммы заказа при любом изменении позиций
+CREATE OR REPLACE FUNCTION fn_orders_recalc_total() RETURNS trigger
+LANGUAGE plpgsql AS $$
+DECLARE
+    v_order INT := COALESCE(NEW.order_id, OLD.order_id);
+BEGIN
+    UPDATE orders
+       SET total_amount = (SELECT COALESCE(SUM(line_sum), 0)
+                             FROM order_items WHERE order_id = v_order)
+     WHERE order_id = v_order;
+    RETURN NULL;
+END;
+$$;
+
+CREATE TRIGGER trg_order_items_total
+AFTER INSERT OR UPDATE OR DELETE ON order_items
+FOR EACH ROW EXECUTE FUNCTION fn_orders_recalc_total();
+
+-- Аудит смены статуса заказа
+CREATE OR REPLACE FUNCTION fn_orders_status_audit() RETURNS trigger
+LANGUAGE plpgsql AS $$
+BEGIN
+    IF TG_OP = 'INSERT' THEN
+        INSERT INTO order_status_log (order_id, old_status, new_status, changed_by)
+        VALUES (NEW.order_id, NULL, NEW.status, NEW.manager_id);
+    ELSIF OLD.status IS DISTINCT FROM NEW.status THEN
+        INSERT INTO order_status_log (order_id, old_status, new_status, changed_by)
+        VALUES (NEW.order_id, OLD.status, NEW.status,
+                NULLIF(current_setting('app.user_id', TRUE), '')::INT);
+    END IF;
+    RETURN NULL;
+END;
+$$;
+
+CREATE TRIGGER trg_orders_status_audit
+AFTER INSERT OR UPDATE OF status ON orders
+FOR EACH ROW EXECUTE FUNCTION fn_orders_status_audit();
+
+-- Автоматическая отметка времени изменения
+CREATE OR REPLACE FUNCTION fn_set_updated_at() RETURNS trigger
+LANGUAGE plpgsql AS $$
+BEGIN
+    NEW.updated_at := now();
+    RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER trg_orders_updated_at
+BEFORE UPDATE ON orders
+FOR EACH ROW EXECUTE FUNCTION fn_set_updated_at();
+
+CREATE TRIGGER trg_products_updated_at
+BEFORE UPDATE ON products
+FOR EACH ROW EXECUTE FUNCTION fn_set_updated_at();
+
+CREATE TRIGGER trg_users_updated_at
+BEFORE UPDATE ON users
+FOR EACH ROW EXECUTE FUNCTION fn_set_updated_at();

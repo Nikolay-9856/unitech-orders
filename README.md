@@ -2,16 +2,17 @@
 
 Учебный проект производственной практики, ООО «Юнитех Экспорт», IT-отдел. PostgreSQL 16 + Python 3 / Flask 3.
 
-## Версия v3.0 — представления и хранимые процедуры
+## Версия v4.0 — триггеры и роли СУБД
 
 ### Что вошло в версию
-- `sql/03_objects.sql`: VIEW `v_orders_full`, `v_customer_stats`, `v_product_sales`; процедуры `sp_create_order`, `sp_add_order_item`, `sp_change_order_status`, `sp_register_payment`, `sp_register_user`
-- в карточке заказа: смена статуса по допустимым переходам с резервированием остатка, регистрация оплат
-- страница «Пользователи» для администратора
-- обработка ошибок RAISE EXCEPTION по коду SQLSTATE
+- триггеры: `trg_order_items_line_sum`, `trg_order_items_total` (суммы), `trg_orders_status_audit` (журнал статусов), `trg_orders_updated_at`, `trg_products_updated_at`, `trg_users_updated_at`
+- пересчёт суммы заказа перенесён из процедуры в триггеры
+- `sql/05_roles.sql`: роли `ute_reader`, `ute_operator`, `ute_admin` и пользователи `ute_app_reader`, `ute_app_operator`, `ute_app_admin`
+- приложение подключается под учётной записью СУБД, соответствующей роли пользователя (`APP_ROLE_TO_DB` в `app/db.py`)
 
 ### Развёртывание
-1. Выполнить `sql/01_schema.sql`, `sql/02_data.sql`, `sql/03_objects.sql`
-2. `pip install flask psycopg2-binary`
-3. `app/.env` по образцу `app/.env.example`
-4. `cd app && python app.py` → http://127.0.0.1:5080
+1. Выполнить по порядку: `sql/01_schema.sql`, `sql/02_data.sql`, `sql/03_objects.sql`, `sql/05_roles.sql` (пароли пользователей СУБД задать свои)
+2. В `pg_hba.conf` для 127.0.0.1 указать `scram-sha-256`
+3. `pip install flask psycopg2-binary`
+4. `app/.env` по образцу `app/.env.example`
+5. `cd app && python app.py` → http://127.0.0.1:5080

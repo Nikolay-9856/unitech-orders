@@ -239,9 +239,6 @@ def item_delete(order_id, item_id):
         """DELETE FROM order_items oi USING orders o
            WHERE oi.item_id = %s AND oi.order_id = o.order_id AND o.order_id = %s AND o.status = 'Новый'""",
         (item_id, order_id), app_role=AppSession.role())
-    DBConnection.execute("""UPDATE orders SET total_amount =
-                       (SELECT COALESCE(SUM(line_sum), 0) FROM order_items WHERE order_id = %s)
-                   WHERE order_id = %s""", (order_id, order_id))
     flash("Позиция удалена" if n else "Позиции можно удалять только у нового заказа", "ok" if n else "warn")
     return redirect(url_for("order_card", order_id=order_id))
 
